@@ -11,3 +11,5 @@ Parts of the wallpaper extension's XPC bridge are adapted from [kageroumado/phos
 The recorded-aerial temporal encoder is adapted from [AlexisBCD/macos-custom-video-wallpaper-fix](https://github.com/AlexisBCD/macos-custom-video-wallpaper-fix). Its original MIT notice is retained in [tools/aerial/LICENSE.temporal-encoder](tools/aerial/LICENSE.temporal-encoder).
 
 These third-party licenses apply to their respective components. No project-wide license has been added during extraction.
+
+Portal and Flight were added in September 2026. Portal renders the WorkOS symbol as a magnesium sculpture, with an outline adapted from the official mark on the [WorkOS website](https://workos.com/), viewed September 8, 2026. Its material, lighting, and rendering are original procedural artwork, developed from a generated material concept. It is not an official WorkOS wallpaper. Flight is original procedural artwork. Both shaders are self-contained and require no external image assets or textures.

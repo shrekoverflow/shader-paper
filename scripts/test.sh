@@ -13,3 +13,6 @@ build/native/test-selection
 xcrun swiftc "${common[@]}" Sources/Shared/*.swift Tests/RendererLifecycleTests.swift \
   -o build/native/test-lifecycle -framework AppKit -framework Metal -framework AVFoundation
 build/native/test-lifecycle Resources
+xcrun swiftc "${common[@]}" Sources/Shared/*.swift Tests/DaylightTests.swift \
+  -o build/native/test-daylight -framework AppKit -framework Metal -framework AVFoundation
+build/native/test-daylight Resources

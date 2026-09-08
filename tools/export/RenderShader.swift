@@ -19,7 +19,7 @@ struct Options {
     init() throws {
         let args = Array(CommandLine.arguments.dropFirst())
         guard let command = args.first, ["still", "movie", "validate", "moviecheck"].contains(command) else {
-            throw failure("Usage: render-shader still|movie|validate|moviecheck --shader FILE --out FILE [--input MOVIE --width N --height N --time SECONDS --duration SECONDS --fps N]")
+            throw failure("Usage: render-shader still|movie|validate|moviecheck --shader FILE --out FILE [--input MOVIE --width N --height N --time SECONDS --hour HOUR --duration SECONDS --fps N]")
         }
         self.command = command
         var values: [String: String] = [:]
@@ -107,7 +107,7 @@ final class FloatProbe {
         descriptor.colorAttachments[0].pixelFormat = .rgba16Float
         pipeline = try device.makeRenderPipelineState(descriptor: descriptor)
     }
-    func inspect(time: Double, width: Int, height: Int) throws -> [String: Any] {
+    func inspect(time: Double, width: Int, height: Int, localHour: Float) throws -> [String: Any] {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: width, height: height, mipmapped: false)
         descriptor.storageMode = .shared; descriptor.usage = .renderTarget
         let texture = device.makeTexture(descriptor: descriptor)!
@@ -117,8 +117,10 @@ final class FloatProbe {
         pass.colorAttachments[0].loadAction = .dontCare; pass.colorAttachments[0].storeAction = .store
         let encoder = command.makeRenderCommandEncoder(descriptor: pass)!
         var t = Float(time)
+        var hour = localHour
         encoder.setRenderPipelineState(pipeline)
         encoder.setFragmentBytes(&t, length: 4, index: 0)
+        encoder.setFragmentBytes(&hour, length: 4, index: 1)
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         encoder.endEncoding(); command.commit(); command.waitUntilCompleted()
         if let error = command.error { throw error }
@@ -131,8 +133,8 @@ final class FloatProbe {
             if i % 4 == 3 { if value != 1 { badAlpha += 1 } }
             else { minimum = min(minimum, value); maximum = max(maximum, value); if value > 1 { overbright += 1 } }
         }
-        guard nonfinite == 0 && badAlpha == 0 else { throw failure("Nonfinite half-float output or nonopaque alpha at \(time)") }
-        return ["time": time, "width": width, "height": height, "nonfiniteChannels": nonfinite,
+        guard nonfinite == 0 && badAlpha == 0 else { throw failure("Nonfinite half-float output or nonopaque alpha at \(time), local hour \(localHour)") }
+        return ["time": time, "localHour": localHour, "width": width, "height": height, "nonfiniteChannels": nonfinite,
             "nonopaquePixels": badAlpha, "minimumRGB": minimum, "maximumRGB": maximum,
             "overbrightChannelFraction": Double(overbright) / Double(width * height * 3),
             "gpuMilliseconds": max(0, command.gpuEndTime - command.gpuStartTime) * 1000]
@@ -167,31 +169,35 @@ func testClock() throws -> [String: Any] {
     return ["passed": true, "checks": ["saved time", "start continuity", "smooth acceleration integral", "stop continuity", "settling", "12-hour exact hold", "resume continuity", "resume integral", "saved-time restoration", "invalid-time normalization"], "heldShaderTime": frozen]
 }
 
-func validate(_ kernel: ShaderKernel, source: URL, output: URL) throws {
+func validate(_ kernel: ShaderKernel, source: URL, output: URL, localHour: Float) throws {
     let probe = try FloatProbe(source: source)
     let sampledTimes = [0.0, 18.0, 600.0, 7_200.0, 43_200.0, 86_400.0]
     let sizes = [(640, 400), (400, 640), (1024, 256), (512, 512)]
     var probes: [[String: Any]] = []
-    for time in sampledTimes { for (w, h) in sizes { probes.append(try probe.inspect(time: time, width: w, height: h)) } }
+    for time in sampledTimes { for (w, h) in sizes { probes.append(try probe.inspect(time: time, width: w, height: h, localHour: localHour)) } }
+    // Check the lighting input independently of animation time, without
+    // multiplying the full aspect/time sweep for shaders that use local hour.
+    let hourSamples: [Float] = [0, 6, 12, 18]
+    let localHourSweep = try hourSamples.map { try probe.inspect(time: 18, width: 640, height: 400, localHour: $0) }
     var continuity: [[String: Any]] = []
     for time in sampledTimes {
         let size = CGSize(width: 640, height: 400)
-        let a = bytes(try kernel.frame(time: time, size: size))
-        let repeatA = bytes(try kernel.frame(time: time, size: size))
+        let a = bytes(try kernel.frame(time: time, size: size, localHour: localHour))
+        let repeatA = bytes(try kernel.frame(time: time, size: size, localHour: localHour))
         guard a == repeatA else { throw failure("Equal-time renders differ") }
-        let b = bytes(try kernel.frame(time: time + 1.0 / 30.0, size: size))
-        let c = bytes(try kernel.frame(time: time + 30, size: size))
+        let b = bytes(try kernel.frame(time: time + 1.0 / 30.0, size: size, localHour: localHour))
+        let c = bytes(try kernel.frame(time: time + 30, size: size, localHour: localHour))
         continuity.append(["time": time, "equalTimeByteIdentical": true,
             "nextFrame": delta(a, b), "after30Seconds": delta(a, c)])
     }
     var performance: [[String: Any]] = []
     for (w, h) in [(2560, 1440), (1600, 2560)] {
         let size = CGSize(width: w, height: h)
-        for i in 0..<4 { _ = try kernel.frame(time: Double(i) / 30, size: size) }
+        for i in 0..<4 { _ = try kernel.frame(time: Double(i) / 30, size: size, localHour: localHour) }
         var milliseconds: [Double] = []
         for i in 0..<24 {
             let began = CACurrentMediaTime()
-            _ = try kernel.frame(time: 18 + Double(i) / 30, size: size)
+            _ = try kernel.frame(time: 18 + Double(i) / 30, size: size, localHour: localHour)
             milliseconds.append((CACurrentMediaTime() - began) * 1000)
         }
         let sorted = milliseconds.sorted()
@@ -200,9 +206,9 @@ func validate(_ kernel: ShaderKernel, source: URL, output: URL) throws {
             "medianWallMilliseconds": sorted[sorted.count / 2], "p95WallMilliseconds": sorted[Int(Double(sorted.count - 1) * 0.95)],
             "maximumWallMilliseconds": sorted.last!, "includes": "shader, host SDR conversion, pixel allocation, CPU encode, synchronous GPU wait"])
     }
-    let report: [String: Any] = ["shader": source.path, "shaderSHA256": try sourceHash(source), "generatedUTC": ISO8601DateFormatter().string(from: Date()),
+    let report: [String: Any] = ["shader": source.path, "shaderSHA256": try sourceHash(source), "localHour": localHour, "generatedUTC": ISO8601DateFormatter().string(from: Date()),
         "device": kernel.device.name, "runtimeCompilation": "passed, default options; vertex_main + fragment_main; rgba16Float",
-        "hostHelpers": "compiled directly from Sources/Shared", "floatOutput": probes,
+        "hostHelpers": "compiled directly from Sources/Shared", "floatOutput": probes, "localHourSweep": localHourSweep,
         "continuity": continuity, "performance": performance, "motionClock": try testClock(),
         "limitations": ["Pixel deltas measure change; aesthetic motion quality requires visual review.", "Wall render times are local measurements, not energy measurements.", "Shader time is Float as required by the host; very large accumulated times have lower temporal precision."]]
     let json = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
@@ -210,7 +216,7 @@ func validate(_ kernel: ShaderKernel, source: URL, output: URL) throws {
     print(String(data: json, encoding: .utf8)!)
 }
 
-func movie(_ kernel: ShaderKernel, output: URL, width: Int, height: Int, start: Double, duration: Double, fps: Int) throws {
+func movie(_ kernel: ShaderKernel, output: URL, width: Int, height: Int, start: Double, duration: Double, fps: Int, localHour: Float) throws {
     guard width % 2 == 0 && height % 2 == 0 && duration > 0 && fps > 0 else { throw failure("Movie requires even dimensions and positive duration/fps") }
     if FileManager.default.fileExists(atPath: output.path) { try FileManager.default.removeItem(at: output) }
     let writer = try AVAssetWriter(outputURL: output, fileType: .mp4)
@@ -237,7 +243,7 @@ func movie(_ kernel: ShaderKernel, output: URL, width: Int, height: Int, start: 
             Thread.sleep(forTimeInterval: 0.003)
         }
         try autoreleasepool {
-            let frame = try kernel.frame(time: start + Double(index) / Double(fps), size: size)
+            let frame = try kernel.frame(time: start + Double(index) / Double(fps), size: size, localHour: localHour)
             guard adaptor.append(frame, withPresentationTime: CMTime(value: Int64(index), timescale: Int32(fps))) else {
                 throw writer.error ?? failure("Movie append failed at frame \(index)")
             }
@@ -249,13 +255,13 @@ func movie(_ kernel: ShaderKernel, output: URL, width: Int, height: Int, start: 
     let done = DispatchSemaphore(value: 0)
     writer.finishWriting { done.signal() }; done.wait()
     guard writer.status == .completed else { throw writer.error ?? failure("Movie finish failed") }
-    print("Wrote silent \(width)x\(height) movie: \(count) frames, \(fps) fps, \(duration)s, shader time \(start)...\(start + duration): \(output.path)")
+    print("Wrote silent \(width)x\(height) movie: \(count) frames, \(fps) fps, \(duration)s, shader time \(start)...\(start + duration), local hour \(localHour): \(output.path)")
 }
 
 // Decode every encoded sample, verify timing and track topology, and compare
 // several decoded frames with the exact host renderer. The comparison naturally
 // includes expected H.264 losses and RGB/YUV conversion differences.
-func checkMovie(_ kernel: ShaderKernel, source: URL, input: URL, output: URL, start: Double, duration: Double, fps: Int) async throws {
+func checkMovie(_ kernel: ShaderKernel, source: URL, input: URL, output: URL, start: Double, duration: Double, fps: Int, localHour: Float) async throws {
     let asset = AVURLAsset(url: input)
     guard let track = try await asset.loadTracks(withMediaType: .video).first else { throw failure("Movie has no video track") }
     guard try await asset.loadTracks(withMediaType: .audio).isEmpty else { throw failure("Movie is not silent") }
@@ -278,7 +284,7 @@ func checkMovie(_ kernel: ShaderKernel, source: URL, input: URL, output: URL, st
         priorTime = time
         if sampleIndices.contains(count), let pixel = CMSampleBufferGetImageBuffer(sample) {
             let size = CGSize(width: CVPixelBufferGetWidth(pixel), height: CVPixelBufferGetHeight(pixel))
-            let reference = try kernel.frame(time: start + time, size: size)
+            let reference = try kernel.frame(time: start + time, size: size, localHour: localHour)
             let image = CIImage(cvPixelBuffer: pixel)
             let decodedImage = colorContext.createCGImage(image, from: image.extent, format: .RGBA8,
                 colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)!
@@ -292,7 +298,7 @@ func checkMovie(_ kernel: ShaderKernel, source: URL, input: URL, output: URL, st
     }
     guard reader.status == .completed else { throw reader.error ?? failure("Movie did not decode to completion") }
     guard count == expectedCount && abs(assetDuration - duration) < 0.001 else { throw failure("Movie duration or decoded frame count mismatch") }
-    let report: [String: Any] = ["movie": input.path, "comparisonShaderSHA256": try sourceHash(source), "passed": true, "decodedFrames": count, "expectedFrames": expectedCount,
+    let report: [String: Any] = ["movie": input.path, "comparisonShaderSHA256": try sourceHash(source), "localHour": localHour, "passed": true, "decodedFrames": count, "expectedFrames": expectedCount,
         "width": naturalSize.width, "height": naturalSize.height, "nominalFPS": frameRate,
         "durationSeconds": assetDuration, "audioTracks": 0, "firstPresentationSeconds": firstTime,
         "colorComparison": "Decoded Rec.709 frames converted to sRGB through Core Image before comparison; expected H.264/chroma losses remain.",
@@ -312,6 +318,11 @@ func checkMovie(_ kernel: ShaderKernel, source: URL, input: URL, output: URL, st
             let widthValue = try options.number("width", 1920), heightValue = try options.number("height", 1080)
             let fpsValue = try options.number("fps", 30), duration = try options.number("duration", 30)
             let time = try options.number("time", 0)
+            let hourValue = try options.number("hour", 12)
+            let localHour = Float(hourValue)
+            guard hourValue >= 0 && hourValue < 24 && localHour < 24 else {
+                throw failure("Use --hour from 0 (inclusive) to 24 (exclusive), such as 6.5 for 06:30")
+            }
             guard [widthValue, heightValue].allSatisfy({ $0 >= 1 && $0 <= 16384 && $0.rounded() == $0 }),
                   fpsValue >= 1 && fpsValue <= 240 && fpsValue.rounded() == fpsValue,
                   duration * fpsValue >= 1 && duration * fpsValue <= 1_000_000_000,
@@ -323,15 +334,15 @@ func checkMovie(_ kernel: ShaderKernel, source: URL, input: URL, output: URL, st
             let kernel = try ShaderKernel(source: source)
             switch options.command {
             case "still":
-                try writePNG(kernel.frame(time: time, size: CGSize(width: width, height: height)), to: output)
-                print("Wrote \(width)x\(height) PNG at shader time \(time): \(output.path)")
+                try writePNG(kernel.frame(time: time, size: CGSize(width: width, height: height), localHour: localHour), to: output)
+                print("Wrote \(width)x\(height) PNG at shader time \(time), local hour \(localHour): \(output.path)")
             case "movie":
                 try movie(kernel, output: output, width: width, height: height, start: time,
-                    duration: duration, fps: fps)
+                    duration: duration, fps: fps, localHour: localHour)
             case "moviecheck":
                 try await checkMovie(kernel, source: source, input: URL(fileURLWithPath: try options.required("input")), output: output, start: time,
-                    duration: duration, fps: fps)
-            default: try validate(kernel, source: source, output: output)
+                    duration: duration, fps: fps, localHour: localHour)
+            default: try validate(kernel, source: source, output: output, localHour: localHour)
             }
         } catch { fputs("ERROR: \(error.localizedDescription)\n", stderr); exit(1) }
     }

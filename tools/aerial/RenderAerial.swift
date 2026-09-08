@@ -50,8 +50,10 @@ func draw(at seconds: Double) throws {
     pass.colorAttachments[0].storeAction = .store
     let encoder = command.makeRenderCommandEncoder(descriptor: pass)!
     var time = Float(30 * (1 - cos(2 * .pi * seconds / 120)))
+    var localHour: Float = 12 // Fixed daylight for optional time-aware artwork.
     encoder.setRenderPipelineState(pipeline)
     encoder.setFragmentBytes(&time, length: MemoryLayout<Float>.size, index: 0)
+    encoder.setFragmentBytes(&localHour, length: MemoryLayout<Float>.size, index: 1)
     encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
     encoder.endEncoding()
     command.commit()

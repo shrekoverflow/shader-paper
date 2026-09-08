@@ -57,6 +57,16 @@ final class Engine {
         }
         let token = workspace.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main) { [weak self] _ in self?.applyPolicy() }
         observers.append((workspace, token))
+        let system = NotificationCenter.default
+        for name in [Notification.Name.NSSystemTimeZoneDidChange, Notification.Name.NSSystemClockDidChange] {
+            let token = system.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                guard let self else { return }
+                for surface in self.surfaces.values {
+                    surface.renderer.refreshDaylight()
+                }
+            }
+            observers.append((system, token))
+        }
     }
     func update(mode: String, activity: String) {
         self.mode = mode; self.activity = activity
@@ -68,7 +78,10 @@ final class Engine {
         let moving = !hardPause && (mode == "locked" || mode == "idle" || mode == "screenSaver")
         let visible = Set(surfaces.values.filter { !$0.preview && $0.valid }.map { $0.renderer.entry.id })
         for (id, clock) in clocks { clock.setMoving(moving && visible.contains(id), immediately: hardPause || !visible.contains(id)) }
-        for surface in surfaces.values where !surface.preview && surface.valid {
+        for surface in surfaces.values {
+            let daylightVisible = !surface.preview && surface.valid && !sleeping && activity == "active"
+            surface.renderer.setDaylightUpdatesEnabled(daylightVisible)
+            guard !surface.preview && surface.valid else { continue }
             if hardPause { surface.renderer.stop() }
             else if !surface.renderer.clock.settled { surface.renderer.start() }
         }
@@ -86,6 +99,7 @@ final class Engine {
         }
         let existing = surfaces[id]
         existing?.renderer.stop()
+        existing?.renderer.setDaylightUpdatesEnabled(false)
         let context: CAContext
         if let old = existing { context = old.context }
         else {
@@ -122,6 +136,7 @@ final class Engine {
         guard let surface = surfaces[id] else { return }
         surfaces[id]?.valid = false
         surface.renderer.stop()
+        surface.renderer.setDaylightUpdatesEnabled(false)
         if !surfaces.values.contains(where: { !$0.preview && $0.renderer.isRendering && $0.renderer.entry.id == surface.renderer.entry.id }) {
             surface.renderer.clock.setMoving(false, immediately: true)
         }

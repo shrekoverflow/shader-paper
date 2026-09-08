@@ -2,20 +2,25 @@
 
 Living wallpapers, drawn in Metal.
 
-Shader Paper moves while your Mac is locked or showing its screen saver, gently settles when you return, and holds that exact frame while you work. Each wallpaper remembers its place and continues from there next time.
+Shader Paper moves while your Mac is locked or showing its screen saver, gently settles when you return, and holds its place while you work. Each wallpaper remembers its place and continues from there next time. Flight's sky also follows your Mac's local time, with dawn, daylight, sunset, and moonlit clouds.
 
 ![Ink](docs/previews/Ink.png)
 
 ## The collection
 
-Six included wallpapers: **Fable 5**, **GPT6-Astra**, **GPT6-Astra-II**, **Ink**, **Light**, and **Weather**.
+Eight included wallpapers: **Fable 5**, **GPT6-Astra**, **GPT6-Astra-II**, **Ink**, **Light**, **Weather**, **Portal**, and **Flight**.
+
+| Portal | Flight |
+| --- | --- |
+| ![Portal](docs/previews/Portal.png) | ![Flight](docs/previews/Flight.png) |
+| The [WorkOS](https://workos.com/) mark sculpted in magnesium: fine bead-blasted faces, precise chamfers, brushed cut walls, subtle violet and blue reflections, and a gentle turn accompanied by a drifting camera. | Tiny airliners crossing sunlit cloud banks, leaving fine trails that slowly dissolve. |
 
 | Ink | Light | Weather |
 | --- | --- | --- |
 | ![Ink](docs/previews/Ink.png) | ![Light](docs/previews/Light.png) | ![Weather](docs/previews/Weather.png) |
 | Graphite finding paths through paper. | A quiet caustic cast by unseen glass. | Mist passing through a small landscape. |
 
-The artwork renders directly from its saved time. There is no recorded loop in the native wallpaper app. Once the image settles, its rendering timer stops.
+The artwork renders directly from its saved time. There is no recorded loop in the native wallpaper app. Once motion settles, its animation timer stops. Flight refreshes its lighting about once a minute while the aircraft and clouds stay still; other wallpapers retain the exact settled frame. Sky colors follow an artistic daily schedule, without location access or a sunrise calculation. Sleep and inactive surfaces stop these lighting updates too.
 
 ## Build and run
 
@@ -32,7 +37,17 @@ Choose a wallpaper and click **Use as Wallpaper**. You can then close the galler
 
 **Restore Previous Wallpaper** restores the selection saved before activation. Existing Visual Meditation users should follow the [migration notes](docs/migration.md) to avoid registering two copies of the same extension.
 
-This app uses private macOS wallpaper interfaces and local ad-hoc signing. It is experimental: macOS updates may require adapting the extension. The build is intended for your own Mac; signed and notarized distribution is not configured.
+This app uses private macOS wallpaper interfaces and local ad-hoc signing. It is experimental: macOS updates may require adapting the extension. A transferable archive is available for personal use; Developer ID signing and notarization are not configured.
+
+## Transfer to another Mac
+
+```sh
+bash scripts/package.sh
+```
+
+This builds and verifies the app, then writes a versioned ZIP and SHA-256 checksum under `build/distribution/`. Transfer the ZIP to an Apple Silicon Mac running macOS 26 or later, unpack it, and follow the included [transfer instructions](docs/transfer.md). The archive includes the app and its wallpaper extension; the destination does not need Xcode to try this build. Managed Macs may restrict locally signed apps.
+
+Packaging does not install, register, or select a wallpaper. Source-build instructions and existing-installation guidance are included in the archive.
 
 ## Export a video or still
 
@@ -70,6 +85,6 @@ Builds compile and render every selected shader at two times and aspect ratios. 
 
 Live rendering uses 30 fps, or 15 in Low Power Mode, and caps the long edge at 2560 pixels. Lock/unlock changes motion over two seconds. Sleep and Reduce Motion pause immediately. The renderer converts half-float artwork to SDR for display. Exports can use higher resolutions.
 
-Shader entry points are `vertex_main` and `fragment_main`, with a single `Float` time at fragment buffer 0. See [architecture](docs/architecture.md) and the [artwork review](docs/studies/README.md).
+Shader entry points are `vertex_main` and `fragment_main`, with a `Float` animation time at fragment buffer 0 and an optional `Float` local hour at fragment buffer 1. Build thumbnails and exports default to noon; use `--hour` when exporting a different sky. See [architecture](docs/architecture.md) and the [artwork review](docs/studies/README.md).
 
 Shader Paper grew out of [A Visual Meditation on Thinking](https://github.com/kanalo-shrek/a-visual-meditation). That project retains the original model experiment. Source history and third-party attributions are documented in [NOTICE.md](NOTICE.md).
