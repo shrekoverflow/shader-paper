@@ -37,7 +37,7 @@ Choose a wallpaper and click **Use as Wallpaper**. You can then close the galler
 
 **Restore Previous Wallpaper** restores the selection saved before activation. Existing Visual Meditation users should follow the [migration notes](docs/migration.md) to avoid registering two copies of the same extension.
 
-This app uses private macOS wallpaper interfaces and local ad-hoc signing. It is experimental: macOS updates may require adapting the extension. A transferable archive is available for personal use; Developer ID signing and notarization are not configured.
+This app uses private macOS wallpaper interfaces and is experimental: macOS updates may require adapting the extension. Builds default to local ad-hoc signing. You can supply a Developer ID Application identity through `CODE_SIGN_IDENTITY`; notarization is a separate step described in the [transfer instructions](docs/transfer.md#developer-id-signing-and-notarization).
 
 ## Transfer to another Mac
 
@@ -45,7 +45,7 @@ This app uses private macOS wallpaper interfaces and local ad-hoc signing. It is
 bash scripts/package.sh
 ```
 
-This builds and verifies the app, then writes a versioned ZIP and SHA-256 checksum under `build/distribution/`. Transfer the ZIP to an Apple Silicon Mac running macOS 26 or later, unpack it, and follow the included [transfer instructions](docs/transfer.md). The archive includes the app and its wallpaper extension; the destination does not need Xcode to try this build. Managed Macs may restrict locally signed apps.
+This builds and verifies the app, then writes a versioned ZIP and SHA-256 checksum under `build/distribution/`. Transfer the ZIP to an Apple Silicon Mac running macOS 26 or later, unpack it, and follow the included [transfer instructions](docs/transfer.md). The archive includes the app, its wallpaper extension, and `SIGNING.txt` identifying the actual signer and stapled notarization ticket result; the destination does not need Xcode to try this build. Managed Macs may restrict the app regardless of signing or notarization.
 
 Packaging does not install, register, or select a wallpaper. Source-build instructions and existing-installation guidance are included in the archive.
 

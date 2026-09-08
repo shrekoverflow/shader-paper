@@ -6,6 +6,13 @@ app="$out/Shader Paper.app"
 ext="$app/Contents/Extensions/MeditationExtension.appex"
 mkdir -p "$out" "$repo/build/module-cache" "$app/Contents/MacOS" "$app/Contents/Resources" "$ext/Contents/MacOS" "$ext/Contents/Resources"
 common=(-O -swift-version 5 -target arm64-apple-macos26.0 -module-cache-path "$repo/build/module-cache")
+code_sign_identity="${CODE_SIGN_IDENTITY:--}"
+signing=(--force --sign "$code_sign_identity" --options runtime)
+if [[ "$code_sign_identity" != - ]]; then
+  # Developer ID distribution requires a secure timestamp; local ad-hoc
+  # builds keep their existing offline signing behavior.
+  signing+=(--timestamp)
+fi
 # Bundle only the curated collection declared in Resources/Shaders.txt.
 # Clear generated resources so rebuilding an older bundle also removes choices
 # that are no longer featured.
@@ -40,7 +47,7 @@ for bundle in "$app" "$ext"; do
 done
 cp "$repo/Sources/App/Info.plist" "$app/Contents/Info.plist"
 cp "$repo/Sources/Extension/Info.plist" "$ext/Contents/Info.plist"
-codesign --force --sign - --options runtime --entitlements "$repo/Sources/Extension/Entitlements.plist" "$ext"
-codesign --force --sign - --options runtime "$app"
+codesign "${signing[@]}" --entitlements "$repo/Sources/Extension/Entitlements.plist" "$ext"
+codesign "${signing[@]}" "$app"
 codesign --verify --deep --strict "$app"
 printf 'Built %s\n' "$app"

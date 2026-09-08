@@ -11,6 +11,8 @@ usage() {
   printf 'Usage: bash scripts/package.sh [--skip-build]\n'
   printf 'Build and package Shader Paper for another Apple Silicon Mac running macOS 26+.\n'
   printf 'Use --skip-build only after building the app you intend to transfer.\n'
+  printf 'Set CODE_SIGN_IDENTITY to sign a new build with a certificate; default is ad-hoc.\n'
+  printf 'Packaging reports the existing signature and stapled ticket; it does not notarize.\n'
 }
 
 if [[ $# -gt 1 ]]; then
@@ -85,6 +87,30 @@ cp "$repo/docs/transfer.md" "$release/docs/transfer.md"
 cp "$repo/docs/migration.md" "$release/docs/migration.md"
 cp "$repo/LICENSE.phosphene" "$repo/NOTICE.md" "$release/"
 /usr/bin/codesign --verify --deep --strict "$release/Shader Paper.app"
+signature_info="$(/usr/bin/codesign --display --verbose=4 "$release/Shader Paper.app" 2>&1)"
+signing_identity="$(printf '%s\n' "$signature_info" | /usr/bin/awk '/^Authority=/ { sub(/^Authority=/, ""); print; exit }')"
+signing_team="$(printf '%s\n' "$signature_info" | /usr/bin/awk '/^TeamIdentifier=/ { sub(/^TeamIdentifier=/, ""); print; exit }')"
+if [[ "$signature_info" == *"Signature=adhoc"* ]]; then
+  signing_status='Ad-hoc (local signing; no Apple Developer identity)'
+  signing_identity='None (ad-hoc)'
+elif [[ "$signing_identity" == 'Developer ID Application: '* ]]; then
+  signing_status='Developer ID signed'
+else
+  signing_status='Certificate signed (not Developer ID Application)'
+fi
+signing_team="${signing_team:-Not available}"
+ticket_status='Not verified (stapler validate did not succeed); notarization status is unknown.'
+if /usr/bin/xcrun stapler validate "$release/Shader Paper.app" > "$staging/stapler.log" 2>&1; then
+  ticket_status='Verified (stapler validate succeeded).'
+fi
+{
+  printf 'Shader Paper %s (%s)\n\n' "$version" "$build"
+  printf 'Signing: %s\nIdentity: %s\nTeam: %s\n' "$signing_status" "${signing_identity:-Not available}" "$signing_team"
+  printf 'Stapled notarization ticket: %s\n\n' "$ticket_status"
+  printf 'This report describes the enclosed app at packaging time.\n'
+  printf 'Developer ID signing alone does not mean Apple notarized the app.\n'
+  printf 'See docs/transfer.md for compatibility, installation, and signing instructions.\n'
+} > "$release/SIGNING.txt"
 /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$release" "$staging/$name.zip"
 (
   cd "$staging"
@@ -93,4 +119,5 @@ cp "$repo/LICENSE.phosphene" "$repo/NOTICE.md" "$release/"
 mv "$staging/$name.zip" "$out/$name.zip"
 mv "$staging/$name.zip.sha256" "$out/$name.zip.sha256"
 printf 'Package: %s\nChecksum: %s\n' "$out/$name.zip" "$out/$name.zip.sha256"
-printf 'This is a locally signed personal build; see docs/transfer.md for compatibility and installation.\n'
+printf 'Signing: %s\nStapled notarization ticket: %s\n' "$signing_status" "$ticket_status"
+printf 'The archive includes SIGNING.txt with the app signing identity and ticket verification result.\n'
