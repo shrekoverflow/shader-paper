@@ -13,7 +13,7 @@ Build with `bash tools/export/build.sh` from the repository root. This tool comp
 
 All commands require `--shader FILE --out FILE`. The default dimensions are 1920 × 1080, time is 0 seconds, and movies default to 30 seconds at 30 fps. Use `--width`, `--height`, `--time`, `--duration`, and `--fps` to change them. Movie dimensions must be even. Output paths should be new files under `build/`.
 
-`--hour` sets a fixed local hour independently of animation time, defaulting to 12 (noon). Use a finite value from 0 inclusive to 24 exclusive; fractional values are supported, such as `--hour 6.5` for 06:30. Flight uses this input for its daylight mood; shaders without local-hour lighting ignore it. The chosen hour stays fixed throughout an export rather than following the computer's clock.
+`--hour` sets a fixed local hour independently of animation time, defaulting to 12 (noon). Use a finite value from 0 inclusive to 24 exclusive; fractional values are supported, such as `--hour 6.5` for 06:30. Flight uses this input for its sky and Portal for its neutral studio lighting; shaders without local-hour lighting ignore it. The chosen hour stays fixed throughout an export rather than following the computer's clock.
 
 ```sh
 build/export/render-shader movie --shader Resources/shaders/Flight.shader \

@@ -2,7 +2,7 @@
 
 Living wallpapers, drawn in Metal.
 
-Shader Paper moves while your Mac is locked or showing its screen saver, gently settles when you return, and holds its place while you work. Each wallpaper remembers its place and continues from there next time. Flight's sky also follows your Mac's local time, with dawn, daylight, sunset, and moonlit clouds.
+Shader Paper moves while your Mac is locked or showing its screen saver, gently settles when you return, and holds its place while you work. Each wallpaper remembers its place and continues from there next time. Flight's sky and Portal's studio lighting also follow your Mac's local time. Flight shifts through dawn, daylight, sunset, and moonlit clouds; Portal shows neutral silver by day and a darker studio at night, with colored edge accents throughout.
 
 ![Ink](docs/previews/Ink.png)
 
@@ -13,14 +13,14 @@ Eight included wallpapers: **Fable 5**, **GPT6-Astra**, **GPT6-Astra-II**, **Ink
 | Portal | Flight |
 | --- | --- |
 | ![Portal](docs/previews/Portal.png) | ![Flight](docs/previews/Flight.png) |
-| The [WorkOS](https://workos.com/) mark sculpted in magnesium: fine bead-blasted faces, precise chamfers, brushed cut walls, subtle violet and blue reflections, and a gentle turn accompanied by a drifting camera. | Tiny airliners crossing sunlit cloud banks, leaving fine trails that slowly dissolve. |
+| The [WorkOS](https://workos.com/) mark sculpted in magnesium: fine bead-blasted faces, precise chamfers, brushed cut walls, directional daylight with silver and blue edge highlights, a dark evening studio, restrained pink, violet, and blue reflections, and a gentle turn accompanied by a drifting camera. | Tiny airliners crossing sunlit cloud banks, leaving fine trails that slowly dissolve. |
 
 | Ink | Light | Weather |
 | --- | --- | --- |
 | ![Ink](docs/previews/Ink.png) | ![Light](docs/previews/Light.png) | ![Weather](docs/previews/Weather.png) |
 | Graphite finding paths through paper. | A quiet caustic cast by unseen glass. | Mist passing through a small landscape. |
 
-The artwork renders directly from its saved time. There is no recorded loop in the native wallpaper app. Once motion settles, its animation timer stops. Flight refreshes its lighting about once a minute while the aircraft and clouds stay still; other wallpapers retain the exact settled frame. Sky colors follow an artistic daily schedule, without location access or a sunrise calculation. Sleep and inactive surfaces stop these lighting updates too.
+The artwork renders directly from its saved time. There is no recorded loop in the native wallpaper app. Once motion settles, its animation timer stops. Flight and Portal refresh their lighting about once a minute while their motion stays still; other wallpapers retain the exact settled frame. Lighting follows an artistic daily schedule, without location access or a sunrise calculation. Portal eases into daylight from 06:30 to 09:00 and back to night from 17:00 to 20:30, using your Mac’s local time. Sleep and inactive surfaces stop these lighting updates too.
 
 ## Build and run
 
@@ -85,6 +85,6 @@ Builds compile and render every selected shader at two times and aspect ratios. 
 
 Live rendering uses 30 fps, or 15 in Low Power Mode, and caps the long edge at 2560 pixels. Lock/unlock changes motion over two seconds. Sleep and Reduce Motion pause immediately. The renderer converts half-float artwork to SDR for display. Exports can use higher resolutions.
 
-Shader entry points are `vertex_main` and `fragment_main`, with a `Float` animation time at fragment buffer 0 and an optional `Float` local hour at fragment buffer 1. Build thumbnails and exports default to noon; use `--hour` when exporting a different sky. See [architecture](docs/architecture.md) and the [artwork review](docs/studies/README.md).
+Shader entry points are `vertex_main` and `fragment_main`, with a `Float` animation time at fragment buffer 0 and an optional `Float` local hour at fragment buffer 1. Build thumbnails and exports default to noon; use `--hour` when exporting different lighting. See [architecture](docs/architecture.md) and the [artwork review](docs/studies/README.md).
 
 Shader Paper grew out of [A Visual Meditation on Thinking](https://github.com/kanalo-shrek/a-visual-meditation). That project retains the original model experiment. Source history and third-party attributions are documented in [NOTICE.md](NOTICE.md).

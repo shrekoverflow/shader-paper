@@ -191,7 +191,7 @@ final class ShaderRenderer {
     var isRendering: Bool { timer != nil }
     var isUpdatingDaylight: Bool { daylightTimer != nil }
 
-    /// A single environmental refresh per minute keeps the sky current while
+    /// A single environmental refresh per minute keeps environmental lighting current while
     /// motion remains exactly paused. No animation timer runs on the desktop.
     func setDaylightUpdatesEnabled(_ enabled: Bool) {
         guard enabled && kernel.usesLocalTime else {
