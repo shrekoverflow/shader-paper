@@ -64,8 +64,8 @@ for bundle in "$app" "$ext"; do
     [[ -s "$bundle/Contents/Resources/Previews/$shader.png" ]] || fail "Missing bundled preview: $shader"
   done < "$repo/Resources/Shaders.txt"
 done
-/usr/bin/lipo -verify_arch arm64 "$app/Contents/MacOS/VisualMeditation"
-/usr/bin/lipo -verify_arch arm64 "$ext/Contents/MacOS/MeditationExtension"
+/usr/bin/lipo "$app/Contents/MacOS/VisualMeditation" -verify_arch arm64
+/usr/bin/lipo "$ext/Contents/MacOS/MeditationExtension" -verify_arch arm64
 /usr/bin/codesign --verify --strict "$ext"
 /usr/bin/codesign --verify --deep --strict "$app"
 
