@@ -14,4 +14,4 @@ Existing wallpaper selections and progress refer to these identifiers, rather th
 
 For an existing installation, close the gallery, build Shader Paper, preserve a copy of the old app, and unregister the old embedded extension before replacing it with the new app. Register the new embedded extension with `Shader Paper.app/Contents/MacOS/VisualMeditation --register`. Avoid leaving both apps registered under the same provider identifier. Registration alone does not select a wallpaper.
 
-The original a-visual-meditation checkout is retained as the model experiment. This repository includes its own curated shaders, renderer, tools, notices, and tests. It does not require the original checkout or any temporary study directory to build.
+The original a-visual-meditation checkout is retained as the model experiment. This repository includes its own curated shaders, renderer, notices, and tests. It does not require the original checkout or any temporary study directory to build.

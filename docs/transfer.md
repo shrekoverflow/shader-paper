@@ -19,12 +19,7 @@ Selecting a wallpaper applies it across Spaces and displays and links it with th
 
 ## Build from source if needed
 
-A local build requires Xcode or Command Line Tools with the macOS 26 SDK. Your Mac's management policies still apply. If you received `Shader-Paper-source.bundle` alongside the app, create a source checkout from its folder:
-
-```sh
-git clone --branch codex/workos-magnesium-motion Shader-Paper-source.bundle shader-paper
-cd shader-paper
-```
+A local build requires Xcode or Command Line Tools with the macOS 26 SDK. Your Mac's management policies still apply. Download the source archive from the GitHub release or clone this repository.
 
 From this or another complete Shader Paper source checkout, run:
 

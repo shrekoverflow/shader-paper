@@ -91,7 +91,7 @@ import CoreVideo
             renderer.setDaylightUpdatesEnabled(true)
             if let renderError { throw renderError }
             precondition(renderer.isUpdatingDaylight && !renderer.isRendering, "Paused \(entry.id) needs only its daylight timer")
-            precondition(pixels(renderer.lastFrame!) == noon, "Injected noon differs from fixed-hour export")
+            precondition(pixels(renderer.lastFrame!) == noon, "Injected noon differs from fixed-hour render")
             for (newHour, expected) in [(Float(18.5), evening), (Float(0), midnight)] {
                 hour = newHour
                 let count = renderer.frameCount
