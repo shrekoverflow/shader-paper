@@ -82,8 +82,14 @@ final class Engine {
             let daylightVisible = !surface.preview && surface.valid && !sleeping && activity == "active"
             surface.renderer.setDaylightUpdatesEnabled(daylightVisible)
             guard !surface.preview && surface.valid else { continue }
-            if hardPause { surface.renderer.stop() }
+            if hardPause {
+                surface.renderer.stop()
+                // Reduce Motion needs a sharp held frame. Sleep and inactive
+                // surfaces defer that work until they become visible again.
+                if daylightVisible { surface.renderer.restoreNativeFrame() }
+            }
             else if !surface.renderer.clock.settled { surface.renderer.start() }
+            else { surface.renderer.restoreNativeFrame() }
         }
         if !moving { checkpoint() }
     }

@@ -29,6 +29,7 @@ final class ShaderKernel {
     let device: MTLDevice
     let queue: MTLCommandQueue
     let usesLocalTime: Bool
+    private(set) var lastGPUSeconds: TimeInterval = 0
     private let artPipeline: MTLRenderPipelineState
     private let displayPipeline: MTLRenderPipelineState
     private var cache: CVMetalTextureCache!
@@ -121,6 +122,7 @@ final class ShaderKernel {
         finish.endEncoding()
         command.commit(); command.waitUntilCompleted()
         if let error = command.error { throw error }
+        lastGPUSeconds = max(0, command.gpuEndTime - command.gpuStartTime)
         CVBufferSetAttachment(pixel, kCVImageBufferCGColorSpaceKey, CGColorSpace(name: CGColorSpace.sRGB)!, .shouldPropagate)
         return pixel
     }
@@ -139,7 +141,9 @@ final class ShaderRenderer {
     var onSettled: (() -> Void)?
     var onFrame: (() -> Void)?
     var onError: ((Error) -> Void)?
-    var pixelSize: CGSize
+    private(set) var pixelSize: CGSize
+    var resolution: RenderResolution
+    var nativePixelSize: CGSize { resolution.nativeSize }
 
     init(entry: ShaderEntry, clock: MotionClock, root: CALayer, scale: CGFloat,
          daylightHour: @escaping () -> Float = { LocalDaylight.hour() }) throws {
@@ -148,8 +152,8 @@ final class ShaderRenderer {
         // Each destination owns its pool; differently sized Spaces and picker
         // previews must not continually replace one another's render textures.
         kernel = try ShaderKernel(source: entry.sourceURL)
-        let factor = min(scale, 2560 / max(1, max(root.bounds.width, root.bounds.height)))
-        pixelSize = CGSize(width: max(2, (root.bounds.width * factor).rounded()), height: max(2, (root.bounds.height * factor).rounded()))
+        resolution = RenderResolution(bounds: root.bounds.size, backingScale: scale)
+        pixelSize = resolution.nativeSize
         layer.frame = root.bounds
         layer.contentsScale = scale
         layer.videoGravity = .resizeAspectFill
@@ -158,7 +162,12 @@ final class ShaderRenderer {
         try draw()
     }
     func draw() throws {
-        let pixel = try kernel.frame(time: clock.value, size: pixelSize, localHour: daylightHour())
+        _ = try presentFrame(size: nativePixelSize)
+    }
+    @discardableResult
+    private func presentFrame(size: CGSize) throws -> TimeInterval {
+        let start = CACurrentMediaTime()
+        let pixel = try kernel.frame(time: clock.value, size: size, localHour: daylightHour())
         var format: CMVideoFormatDescription?
         guard CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: pixel, formatDescriptionOut: &format) == noErr,
               let format else { throw failure("Could not describe display frame") }
@@ -170,20 +179,41 @@ final class ShaderRenderer {
         (attachments[0] as! NSMutableDictionary)[kCMSampleAttachmentKey_DisplayImmediately] = true
         if layer.sampleBufferRenderer.status == .failed { layer.flush() }
         layer.enqueue(sample)
+        pixelSize = size
         lastFrame = pixel
         frameCount += 1
         CATransaction.flush()
+        return CACurrentMediaTime() - start
+    }
+    func drawAnimationFrame() throws {
+        if clock.settled {
+            // The final frame uses exact settled time and full native detail.
+            // Check before drawing so crossing the easing boundary during a
+            // slow frame cannot leave a reduced-resolution desktop behind.
+            try draw()
+            stop()
+            onSettled?()
+        } else {
+            let seconds = try presentFrame(size: resolution.animationSize)
+            resolution.recordFrame(seconds: seconds)
+        }
+        onFrame?()
+    }
+    func restoreNativeFrame() {
+        guard !isRendering && pixelSize != nativePixelSize else { return }
+        do { try draw() }
+        catch { setDaylightUpdatesEnabled(false); onError?(error) }
     }
     func start() {
         guard timer == nil else { return }
         let source = DispatchSource.makeTimerSource(queue: .main)
         let fps = ProcessInfo.processInfo.isLowPowerModeEnabled ? 15 : 30
+        resolution.beginAnimation(framesPerSecond: Double(fps))
         source.schedule(deadline: .now(), repeating: 1.0 / Double(fps), leeway: .milliseconds(2))
         source.setEventHandler { [weak self] in
             guard let self, self.isRendering else { return }
-            do { try self.draw(); self.onFrame?() }
+            do { try self.drawAnimationFrame() }
             catch { self.stop(); self.setDaylightUpdatesEnabled(false); self.onError?(error); return }
-            if self.clock.settled { self.stop(); self.onSettled?() }
         }
         timer = source; source.resume()
     }

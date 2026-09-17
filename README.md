@@ -57,7 +57,9 @@ Packaging does not install, register, or select a wallpaper. Source-build instru
 bash scripts/test.sh
 ```
 
-Builds compile and render every selected shader at two times and aspect ratios. Tests check clock easing, exact pause and resume, retained display frames with no active rendering timer, and wallpaper selection/restore behavior using fixtures.
+Builds compile and render every selected shader at two times and aspect ratios. Tests check clock easing, exact pause and resume, native-resolution settling, measured animation scaling and recovery, retained display frames with no active rendering timer, and wallpaper selection/restore behavior using fixtures.
+
+To measure rendering on your Mac, run `bash scripts/benchmark.sh`. It measures all eight wallpapers at 1440p, 4K, 5K, and attached displays' backing resolutions. The report at `build/native/render-benchmark.json` separates GPU time from complete frame-rendering time; it excludes the display compositor. Benchmarking does not select or install a wallpaper.
 
 | Location | Purpose |
 | --- | --- |
@@ -68,7 +70,7 @@ Builds compile and render every selected shader at two times and aspect ratios. 
 | `Resources/Shaders.txt` | Included collection |
 | `Tests` | Rendering, motion, and selection checks |
 
-Live rendering uses 30 fps, or 15 in Low Power Mode, and caps the long edge at 2560 pixels. Lock/unlock changes motion over two seconds. Sleep and Reduce Motion pause immediately. The renderer converts half-float artwork to SDR for display.
+Rendering starts at the display surface's native backing resolution. Animation targets 30 fps, or 15 in Low Power Mode. If measured frame times consistently exceed that budget, the renderer reduces animation resolution and restores detail when sustained headroom returns. Once motion settles, the desktop retains a full native-resolution frame. Lock/unlock changes motion over two seconds. Sleep and Reduce Motion pause immediately. The renderer converts half-float artwork to SDR for display.
 
 Shader entry points are `vertex_main` and `fragment_main`, with a `Float` animation time at fragment buffer 0 and an optional `Float` local hour at fragment buffer 1. Build thumbnails use fixed noon lighting. See [architecture](docs/architecture.md) and the [artwork review](docs/studies/README.md).
 
